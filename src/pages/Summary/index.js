@@ -118,7 +118,6 @@ const Summary = ({ history }) => {
       .then((querySnapshot) => {
         const dataMonthly = [];
         const dataDaily = [];
-        const totalTransaction = 0;
         querySnapshot.forEach((doc) => {
           if (
             doc.data().createdAt.toDate() >= firstDay &&
