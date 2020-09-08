@@ -15,22 +15,7 @@ function createData(time, amount) {
   return { time, amount };
 }
 
-const data = [
-  createData("1", 0),
-  createData("2", 300),
-  createData("3", 600),
-  createData("4", 800),
-  createData("5", 1500),
-  createData("6", 2000),
-  createData("7", 2400),
-  createData("8", 2400),
-  createData("9", 2400),
-  createData("12", 2700),
-  createData("16", 120),
-  createData("18", 2000),
-];
-
-export default function Chart() {
+const Chart = ({ dataTransaction }) => {
   const theme = useTheme();
 
   return (
@@ -38,7 +23,7 @@ export default function Chart() {
       <Title>This Month</Title>
       <ResponsiveContainer>
         <LineChart
-          data={data}
+          data={dataTransaction?.dataMonthly}
           margin={{
             top: 16,
             right: 16,
@@ -74,4 +59,6 @@ export default function Chart() {
       </ResponsiveContainer>
     </React.Fragment>
   );
-}
+};
+
+export default Chart;

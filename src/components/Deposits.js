@@ -9,18 +9,25 @@ const useStyles = makeStyles({
   },
 });
 
-export default function Deposits() {
+const formatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "IDR",
+});
+
+const Deposits = ({ totalTransaction }) => {
   const classes = useStyles();
 
   return (
     <React.Fragment>
       <Title>Total Transaction</Title>
       <Typography component="p" variant="h4">
-        $3,024.00
+        {formatter.format(totalTransaction)}
       </Typography>
       <Typography color="textSecondary" className={classes.depositContext}>
-        on 15 March, 2019
+        this month
       </Typography>
     </React.Fragment>
   );
-}
+};
+
+export default Deposits;

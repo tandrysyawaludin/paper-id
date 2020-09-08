@@ -11,9 +11,14 @@ import Link from "@material-ui/core/Link";
 import ListItems from "../../components/ListItems";
 import Chart from "../../components/Chart";
 import Deposits from "../../components/Deposits";
-import Orders from "../../components/Orders";
+import TableDefault from "../../components/TableDefault";
 import Navbar from "../../components/Navbar";
-import { checkCookie } from "../../services/cookie.js";
+import { checkCookie, getCookie } from "../../services/cookie.js";
+import firebase from "../../services/firebase.js";
+
+const userId = atob(getCookie("session"));
+
+const db = firebase.firestore();
 
 const Copyright = () => {
   return (
@@ -86,10 +91,86 @@ const Summary = ({ history }) => {
   const classes = useStyles();
   const fixedHeightPaper = clsx(classes.paper, classes.fixedHeight);
   const [open, setOpen] = useState(true);
+  const [dataAccountType, setDataAccountType] = useState([]);
+  const [dataTransaction, setDataTransaction] = useState({});
 
   useEffect(() => {
-    if (!checkCookie("session")) history.push("/");
+    if (!checkCookie("session")) {
+      history.push("/");
+    } else {
+      getAccountType();
+      getData();
+    }
   }, []);
+
+  const getData = () => {
+    const date = new Date(),
+      y = date.getFullYear(),
+      m = date.getMonth();
+    const firstDay = new Date(y, m, 1);
+    const lastDay = new Date(y, m + 1, 0);
+    const startTime = new Date().setHours(0, 0, 0, 0);
+    const endTime = new Date().setHours(23, 59, 59, 999);
+
+    db.collection("transactions")
+      .where("userId", "==", userId)
+      .get()
+      .then((querySnapshot) => {
+        const dataMonthly = [];
+        const dataDaily = [];
+        const totalTransaction = 0;
+        querySnapshot.forEach((doc) => {
+          if (
+            doc.data().createdAt.toDate() >= firstDay &&
+            doc.data().createdAt.toDate() <= lastDay
+          ) {
+            dataMonthly.push({
+              ...doc.data(),
+              ...{
+                time: doc.data().createdAt.toDate().getDate(),
+              },
+            });
+          }
+
+          if (
+            doc.data().createdAt.toDate() >= startTime &&
+            doc.data().createdAt.toDate() <= endTime
+          ) {
+            dataDaily.push(doc.data());
+          }
+        });
+        setDataTransaction({
+          dataMonthly,
+          dataDaily,
+          totalTransaction: dataMonthly
+            .map((x) => x.amount)
+            .reduce((a, b) => a + b, 0),
+        });
+      })
+      .catch((error) => {
+        console.log("Error getting documents: ", error);
+      });
+  };
+
+  const getAccountType = () => {
+    db.collection("account_type")
+      .get()
+      .then((querySnapshot) => {
+        const data = [];
+        querySnapshot.forEach((doc) => {
+          data.push({
+            ...doc.data(),
+            ...{
+              id: doc.id,
+            },
+          });
+        });
+        setDataAccountType(data);
+      })
+      .catch((error) => {
+        console.log("Error getting documents: ", error);
+      });
+  };
 
   const handleDrawerOpen = () => {
     setOpen(true);
@@ -114,22 +195,27 @@ const Summary = ({ history }) => {
         <div className={classes.appBarSpacer} />
         <Container maxWidth="lg" className={classes.container}>
           <Grid container spacing={3}>
-            {/* Chart */}
             <Grid item xs={12} md={8} lg={9}>
               <Paper className={fixedHeightPaper}>
-                <Chart />
+                <Chart dataTransaction={dataTransaction} />
               </Paper>
             </Grid>
-            {/* Recent Deposits */}
+
             <Grid item xs={12} md={4} lg={3}>
               <Paper className={fixedHeightPaper}>
-                <Deposits />
+                <Deposits
+                  totalTransaction={dataTransaction?.totalTransaction}
+                />
               </Paper>
             </Grid>
-            {/* Recent Orders */}
+
             <Grid item xs={12}>
               <Paper className={classes.paper}>
-                <Orders title={"This Month Transaction"} />
+                <TableDefault
+                  dataAccountType={dataAccountType}
+                  title={"Today Transaction"}
+                  dataTable={dataTransaction?.dataDaily}
+                />
               </Paper>
             </Grid>
           </Grid>

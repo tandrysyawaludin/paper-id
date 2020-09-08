@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { makeStyles } from "@material-ui/core/styles";
 import CssBaseline from "@material-ui/core/CssBaseline";
 import Box from "@material-ui/core/Box";
@@ -9,12 +9,21 @@ import Paper from "@material-ui/core/Paper";
 import Link from "@material-ui/core/Link";
 import TextField from "@material-ui/core/TextField";
 import Button from "@material-ui/core/Button";
-import Pagination from "@material-ui/lab/Pagination";
+import Dialog from "@material-ui/core/Dialog";
+import InputLabel from "@material-ui/core/InputLabel";
+import MenuItem from "@material-ui/core/MenuItem";
+import FormHelperText from "@material-ui/core/FormHelperText";
+import FormControl from "@material-ui/core/FormControl";
+import Select from "@material-ui/core/Select";
 import ListItems from "../../components/ListItems";
-import Orders from "../../components/Orders";
+import TableDefault from "../../components/TableDefault";
 import Navbar from "../../components/Navbar";
 import { checkCookie, getCookie } from "../../services/cookie.js";
 import firebase from "../../services/firebase.js";
+
+const userId = atob(getCookie("session"));
+
+const db = firebase.firestore();
 
 const Copyright = () => {
   return (
@@ -88,89 +97,253 @@ const useStyles = makeStyles((theme) => ({
   },
   btnFormControl: {
     margin: theme.spacing(1),
-    width: 100,
+    display: "inline-block",
   },
   pagination: {
     marginTop: 20,
     display: "flex",
     justifyContent: "flex-end",
   },
+  formContainer: {
+    padding: 10,
+  },
 }));
 
 const Home = ({ history }) => {
   const classes = useStyles();
-  const [open, setOpen] = React.useState(true);
-  const [dataTable, setDataTable] = React.useState([]);
+  const [open, setOpen] = useState(true);
+  const [dataTable, setDataTable] = useState([]);
+  const [dataAccountType, setDataAccountType] = useState([]);
+  const [inputValues, setInputValues] = useState({});
+  const [openAlert, setOpenAlert] = useState(false);
+  const [openUpdateForm, setOpenUpdateForm] = useState(false);
 
   useEffect(() => {
     if (!checkCookie("session")) {
       history.push("/");
     } else {
-      const userId = atob(getCookie("session"));
-      const db = firebase.firestore();
+      getData();
+      getAccountType();
+    }
+  }, []);
 
+  const getData = () => {
+    db.collection("transactions")
+      .where("userId", "==", userId)
+      .get()
+      .then((querySnapshot) => {
+        const data = [];
+        querySnapshot.forEach((doc) => {
+          data.push({
+            ...doc.data(),
+            ...{
+              id: doc.id,
+            },
+          });
+        });
+        setDataTable(data);
+      })
+      .catch((error) => {
+        console.log("Error getting documents: ", error);
+      });
+  };
+
+  const getAccountType = () => {
+    db.collection("account_type")
+      .get()
+      .then((querySnapshot) => {
+        const data = [];
+        querySnapshot.forEach((doc) => {
+          data.push({
+            ...doc.data(),
+            ...{
+              id: doc.id,
+            },
+          });
+        });
+        setDataAccountType(data);
+      })
+      .catch((error) => {
+        console.log("Error getting documents: ", error);
+      });
+  };
+
+  const handleChangeValue = (event) => {
+    event.preventDefault();
+    const { name, value } = event.target;
+    setInputValues({ ...inputValues, ...{ [name]: value } });
+  };
+
+  const handleUpdate = (data) => {
+    setOpenUpdateForm(true);
+    setInputValues(data);
+  };
+
+  const handleCreate = () => {
+    setOpenUpdateForm(true);
+    setInputValues({});
+  };
+
+  const handleDelete = (dataId) => {
+    db.collection("transactions")
+      .doc(dataId)
+      .delete()
+      .then(() => {
+        getData();
+      })
+      .catch(function (error) {
+        console.error("Error removing document: ", error);
+      });
+  };
+
+  const handleSearch = (event) => {
+    event.preventDefault();
+    const { startDate = 0, endDate = 0 } = inputValues;
+
+    if (new Date(startDate) > new Date(endDate)) {
+      setOpenAlert(true);
+    } else {
       db.collection("transactions")
         .where("userId", "==", userId)
         .get()
         .then((querySnapshot) => {
           const data = [];
           querySnapshot.forEach((doc) => {
-            data.push({
-              ...doc.data(),
-              ...{
-                id: doc.id,
-              },
-            });
+            if (
+              doc.data().createdAt.toDate() >= new Date(startDate) &&
+              doc.data().createdAt.toDate() <= new Date(endDate)
+            ) {
+              data.push({
+                ...doc.data(),
+                ...{
+                  id: doc.id,
+                },
+              });
+            }
           });
           setDataTable(data);
         })
-        .catch(function (error) {
+        .catch((error) => {
           console.log("Error getting documents: ", error);
         });
     }
-  }, []);
-
-  const handleDrawerOpen = () => {
-    setOpen(true);
   };
 
-  const handleDrawerClose = () => {
-    setOpen(false);
-  };
-
-  const handleSearch = (event) => {
+  const handleSubmitData = (event) => {
     event.preventDefault();
 
-    try {
-      const db = firebase.firestore();
-
-      db.collection("users")
-        .where("username", "==", "admin")
-        .get()
-        .then(function (querySnapshot) {
-          querySnapshot.forEach(function (doc) {
-            // doc.data() is never undefined for query doc snapshots
-            console.log(doc.id, " => ", doc.data());
-          });
+    if (inputValues?.id) {
+      db.collection("transactions")
+        .doc(inputValues?.id)
+        .set({
+          ...inputValues,
+          ...{
+            amount: parseInt(inputValues?.amount),
+            accountTypeId: inputValues?.accountTypeId,
+            createdAt: new Date(),
+          },
+        })
+        .then(function () {
+          getData();
+          setOpenUpdateForm(false);
         })
         .catch(function (error) {
-          console.log("Error getting documents: ", error);
+          console.error("Error writing document: ", error);
         });
-    } catch (error) {
-      console.log(error);
+    } else {
+      db.collection("transactions")
+        .add({
+          userId: userId,
+          amount: parseInt(inputValues?.amount),
+          accountTypeId: inputValues?.accountTypeId,
+          createdAt: new Date(),
+        })
+        .then(function (docRef) {
+          getData();
+          setOpenUpdateForm(false);
+        })
+        .catch(function (error) {
+          console.error("Error adding document: ", error);
+        });
     }
   };
 
   return (
     <div className={classes.root}>
       <CssBaseline />
-      <Navbar open={open} handleDrawerOpen={handleDrawerOpen} />
+      <Navbar
+        open={open}
+        handleDrawerOpen={() => {
+          setOpen(true);
+        }}
+      />
 
       <ListItems
         classes={classes}
         open={open}
-        handleDrawerClose={handleDrawerClose}
+        handleDrawerClose={() => {
+          setOpen(false);
+        }}
       />
+
+      <Dialog
+        onClose={() => {
+          setOpenUpdateForm(false);
+        }}
+        open={openUpdateForm}
+      >
+        <form
+          noValidate
+          autoComplete="off"
+          className={classes.formContainer}
+          onSubmit={handleSubmitData}
+        >
+          <TextField
+            fullWidth
+            label="Amount"
+            defaultValue={parseInt(inputValues?.amount)}
+            variant="outlined"
+            onChange={handleChangeValue}
+            name="amount"
+            type="number"
+            margin="normal"
+          />
+          <FormControl variant="outlined" fullWidth margin="normal">
+            <InputLabel id="account-type-select">Account Type</InputLabel>
+            <Select
+              labelId="account-type-select"
+              onChange={handleChangeValue}
+              defaultValue={inputValues?.accountTypeId}
+              name="accountTypeId"
+              label="Account Type"
+            >
+              {dataAccountType.map((val) => (
+                <MenuItem value={val.id} key={val.id}>
+                  {val.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            margin="normal"
+            fullWidth
+            variant="contained"
+            color="primary"
+            type="submit"
+          >
+            Submit
+          </Button>
+        </form>
+      </Dialog>
+
+      <Dialog
+        onClose={() => {
+          setOpenAlert(false);
+        }}
+        open={openAlert}
+      >
+        Start Date should be lower than End Date
+      </Dialog>
 
       <main className={classes.content}>
         <div className={classes.appBarSpacer} />
@@ -178,6 +351,15 @@ const Home = ({ history }) => {
           <Grid container spacing={3}>
             <Grid item xs={12} md={12} lg={12}>
               <Paper className={classes.paper}>
+                <Button
+                  className={classes.btnFormControl}
+                  variant="contained"
+                  color="primary"
+                  type="submit"
+                  onClick={handleCreate}
+                >
+                  Create Transaction
+                </Button>
                 <form
                   onSubmit={handleSearch}
                   className={classes.root}
@@ -192,6 +374,9 @@ const Home = ({ history }) => {
                     type="date"
                     variant="outlined"
                     className={classes.formControl}
+                    onChange={handleChangeValue}
+                    value={inputValues?.startDate}
+                    name="startDate"
                   />
 
                   <TextField
@@ -202,6 +387,9 @@ const Home = ({ history }) => {
                     type="date"
                     variant="outlined"
                     className={classes.formControl}
+                    onChange={handleChangeValue}
+                    value={inputValues?.endDate}
+                    name="endDate"
                   />
 
                   <Button
@@ -213,10 +401,12 @@ const Home = ({ history }) => {
                     Search
                   </Button>
                 </form>
-                <Orders dataTable={dataTable} />
-                <div className={classes.pagination}>
-                  <Pagination count={10} />
-                </div>
+                <TableDefault
+                  dataAccountType={dataAccountType}
+                  dataTable={dataTable}
+                  handleDelete={handleDelete}
+                  handleUpdate={handleUpdate}
+                />
               </Paper>
             </Grid>
           </Grid>
