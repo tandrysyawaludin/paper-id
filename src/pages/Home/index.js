@@ -12,7 +12,14 @@ import Button from "@material-ui/core/Button";
 import Dialog from "@material-ui/core/Dialog";
 import InputLabel from "@material-ui/core/InputLabel";
 import MenuItem from "@material-ui/core/MenuItem";
+import List from "@material-ui/core/List";
+import ListItem from "@material-ui/core/ListItem";
+import ListItemAvatar from "@material-ui/core/ListItemAvatar";
+import ListItemIcon from "@material-ui/core/ListItemIcon";
+import ListItemSecondaryAction from "@material-ui/core/ListItemSecondaryAction";
+import ListItemText from "@material-ui/core/ListItemText";
 import FormControl from "@material-ui/core/FormControl";
+import ButtonGroup from "@material-ui/core/ButtonGroup";
 import Select from "@material-ui/core/Select";
 import ListItems from "../../components/ListItems";
 import TableDefault from "../../components/TableDefault";
@@ -82,6 +89,7 @@ const useStyles = makeStyles((theme) => ({
   },
   paper: {
     padding: theme.spacing(2),
+    marginBottom: 10,
     display: "block",
     width: "100%",
   },
@@ -115,7 +123,8 @@ const Home = ({ history }) => {
   const [dataAccountType, setDataAccountType] = useState([]);
   const [inputValues, setInputValues] = useState({});
   const [openAlert, setOpenAlert] = useState(false);
-  const [openUpdateForm, setOpenUpdateForm] = useState(false);
+  const [openTransactionForm, setOpenTransactionForm] = useState(false);
+  const [openAccountTypeForm, setOpenAccountTypeForm] = useState(false);
 
   useEffect(() => {
     if (!checkCookie("session")) {
@@ -148,7 +157,7 @@ const Home = ({ history }) => {
   };
 
   const getAccountType = () => {
-    db.collection("account_type")
+    db.collection("account_types")
       .get()
       .then((querySnapshot) => {
         const data = [];
@@ -173,22 +182,32 @@ const Home = ({ history }) => {
     setInputValues({ ...inputValues, ...{ [name]: value } });
   };
 
-  const handleUpdate = (data) => {
-    setOpenUpdateForm(true);
+  const handleUpdate = (data, table) => {
+    if (table === "transactions") {
+      setOpenTransactionForm(true);
+    } else if (table === "account_types") {
+      setOpenAccountTypeForm(true);
+    }
     setInputValues(data);
   };
 
-  const handleCreate = () => {
-    setOpenUpdateForm(true);
+  const handleCreateTransaction = () => {
+    setOpenTransactionForm(true);
     setInputValues({});
   };
 
-  const handleDelete = (dataId) => {
-    db.collection("transactions")
+  const handleCreateAccountType = () => {
+    setOpenAccountTypeForm(true);
+    setInputValues({});
+  };
+
+  const handleDelete = (dataId, table) => {
+    db.collection(table)
       .doc(dataId)
       .delete()
       .then(() => {
         getData();
+        getAccountType();
       })
       .catch(function (error) {
         console.error("Error removing document: ", error);
@@ -228,7 +247,7 @@ const Home = ({ history }) => {
     }
   };
 
-  const handleSubmitData = (event) => {
+  const handleSubmitTransaction = (event) => {
     event.preventDefault();
 
     if (inputValues?.id) {
@@ -244,7 +263,7 @@ const Home = ({ history }) => {
         })
         .then(function () {
           getData();
-          setOpenUpdateForm(false);
+          setOpenTransactionForm(false);
         })
         .catch(function (error) {
           console.error("Error writing document: ", error);
@@ -259,7 +278,44 @@ const Home = ({ history }) => {
         })
         .then(function (docRef) {
           getData();
-          setOpenUpdateForm(false);
+          setOpenTransactionForm(false);
+        })
+        .catch(function (error) {
+          console.error("Error adding document: ", error);
+        });
+    }
+  };
+
+  const handleSubmitAccountType = (event) => {
+    event.preventDefault();
+
+    if (inputValues?.id) {
+      db.collection("account_types")
+        .doc(inputValues?.id)
+        .set({
+          ...inputValues,
+          ...{
+            name: inputValues?.accountTypeName,
+            createdAt: new Date(),
+          },
+        })
+        .then(function () {
+          getAccountType();
+          setOpenAccountTypeForm(false);
+        })
+        .catch(function (error) {
+          console.error("Error writing document: ", error);
+        });
+    } else {
+      db.collection("account_types")
+        .add({
+          userId: userId,
+          name: inputValues?.accountTypeName,
+          createdAt: new Date(),
+        })
+        .then(function (docRef) {
+          getAccountType();
+          setOpenAccountTypeForm(false);
         })
         .catch(function (error) {
           console.error("Error adding document: ", error);
@@ -287,15 +343,50 @@ const Home = ({ history }) => {
 
       <Dialog
         onClose={() => {
-          setOpenUpdateForm(false);
+          setOpenAccountTypeForm(false);
         }}
-        open={openUpdateForm}
+        open={openAccountTypeForm}
       >
         <form
           noValidate
           autoComplete="off"
           className={classes.formContainer}
-          onSubmit={handleSubmitData}
+          onSubmit={handleSubmitAccountType}
+        >
+          <TextField
+            fullWidth
+            label="Name"
+            defaultValue={inputValues?.name}
+            variant="outlined"
+            onChange={handleChangeValue}
+            name="accountTypeName"
+            type="text"
+            margin="normal"
+          />
+
+          <Button
+            margin="normal"
+            fullWidth
+            variant="contained"
+            color="primary"
+            type="submit"
+          >
+            Submit
+          </Button>
+        </form>
+      </Dialog>
+
+      <Dialog
+        onClose={() => {
+          setOpenTransactionForm(false);
+        }}
+        open={openTransactionForm}
+      >
+        <form
+          noValidate
+          autoComplete="off"
+          className={classes.formContainer}
+          onSubmit={handleSubmitTransaction}
         >
           <TextField
             fullWidth
@@ -355,10 +446,11 @@ const Home = ({ history }) => {
                   variant="contained"
                   color="primary"
                   type="submit"
-                  onClick={handleCreate}
+                  onClick={handleCreateTransaction}
                 >
                   Create Transaction
                 </Button>
+
                 <form
                   onSubmit={handleSearch}
                   className={classes.root}
@@ -406,6 +498,48 @@ const Home = ({ history }) => {
                   handleDelete={handleDelete}
                   handleUpdate={handleUpdate}
                 />
+              </Paper>
+
+              <Paper className={classes.paper}>
+                <Button
+                  className={classes.btnFormControl}
+                  variant="contained"
+                  color="primary"
+                  type="submit"
+                  onClick={handleCreateAccountType}
+                >
+                  Create Account Type
+                </Button>
+
+                <List>
+                  {dataAccountType.map((val, key) => (
+                    <ListItem>
+                      <ListItemText primary={val.name} />
+                      <ListItemSecondaryAction>
+                        <ButtonGroup
+                          variant="contained"
+                          color="primary"
+                          aria-label="contained primary button group"
+                        >
+                          <Button
+                            onClick={() => {
+                              handleDelete(val.id, "account_types");
+                            }}
+                          >
+                            Delete
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              handleUpdate(val, "account_types");
+                            }}
+                          >
+                            Update
+                          </Button>
+                        </ButtonGroup>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                </List>
               </Paper>
             </Grid>
           </Grid>

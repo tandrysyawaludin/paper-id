@@ -152,7 +152,7 @@ const Summary = ({ history }) => {
   };
 
   const getAccountType = () => {
-    db.collection("account_type")
+    db.collection("account_types")
       .get()
       .then((querySnapshot) => {
         const data = [];

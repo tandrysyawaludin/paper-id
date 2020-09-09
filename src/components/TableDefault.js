@@ -59,14 +59,14 @@ const TableDefault = ({
                   >
                     <Button
                       onClick={() => {
-                        handleDelete(row.id);
+                        handleDelete(row.id, "transactions");
                       }}
                     >
                       Delete
                     </Button>
                     <Button
                       onClick={() => {
-                        handleUpdate(row);
+                        handleUpdate(row, "transactions");
                       }}
                     >
                       Update
